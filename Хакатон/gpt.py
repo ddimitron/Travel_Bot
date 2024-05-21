@@ -17,7 +17,6 @@ def promt(message):
 
 # TODO GPT запросы для получения информации о городе или важных контактах
 def gpt(message):
-    # TOKEN = get_creds()
     url = f"https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
     user_content = promt(message)
