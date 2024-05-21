@@ -6,6 +6,7 @@ def prepare_database():
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS database (
                 id INTEGER PRIMARY KEY, 
+                user_id INTEGER,
                 city TEXT, 
                 addition TEXT
             )

@@ -4,10 +4,15 @@ import logging
 from telebot.types import KeyboardButton, ReplyKeyboardMarkup
 from gpt import gpt
 from weather_function import get_weather
+from database import execute_selection_query, execute_query, prepare_database
 
-bot = telebot.TeleBot()
+bot = telebot.TeleBot("7002498917:AAG82cmSQFUN_Y6epWLQkQEXlrlbTuIgHpg")
 ADMIN = []  # список админов, должен быть в config.py
+keyboard = ['Узнать интересные места', 'Узнать экстренные контакты',
+            'Узнать погоду'] # должнo быть в config.py
 
+
+prepare_database()
 
 def make_keyboard(items):
     markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -28,56 +33,59 @@ logging.basicConfig(
 def handle_start(message):
     bot.send_message(message.chat.id,
                      "Привет! Я твой помощник в путешествиях. "
-                     "Чем я могу помочь?")
+                     "Введите /help чтобы посмотреть доступные команды.")
+    user = execute_selection_query("SELECT * FROM database WHERE user_id = ?", (message.chat.id,))
+    if user:
+        handle_help(message)
+    else:
+        execute_query('''INSERT INTO database (user_id) VALUES (?)''', (message.chat.id,))
 
 
 @bot.message_handler(commands=['help'])
 def handle_help(message):
-    keyboard = ['/info_city', '/weather_city']
-    markup = make_keyboard(keyboard)
+
     bot.send_message(message.from_user.id,
                      "Привет, я помогу тебе в путешествиях. "
                      "Для работы нажимай на кнопки снизу\n"
-                     "/info_city - информация о городе и его "
-                     "интересных местах\n"
-                     "/weather_city - подсказать погоду в городе",
-                     reply_markup=markup)
+                     "/choose_city - выбрать город")
 
 
-@bot.message_handler(commands=['info_city'])
-def choice_city(message):
+@bot.message_handler(commands=['choose_city'])
+def choose_city(message):
     bot.send_message(message.from_user.id, "Напиши любой город мира:")
+    bot.register_next_step_handler(message, choose_action)
+
+
+def choose_action(message):
+    markup = make_keyboard(keyboard)
+    if message.content_type != 'text':
+        bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
+        return
+    # добавляем город в бд
+    bot.send_message(message.from_user.id, 'Выбери что ты хочешь сделать',
+                     reply_markup=markup)
+    execute_query('''UPDATE database SET city = ? WHERE user_id = ?''', (message.text, message.from_user.id))
     bot.register_next_step_handler(message, give_info_city)
 
 
 def give_info_city(message):
-    city = message.text
     if message.content_type != 'text':
         bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
         return
-    # TODO: добавить здесь валидации
-    # добавка пользователя в бд
-    status, content = gpt(city)
-
-    bot.send_message(message.from_user.id, content)
-
-
-@bot.message_handler(commands=['weather_city'])
-def choice_city(message):
-    bot.send_message(message.from_user.id, "Напиши любой город мира:")
-    bot.register_next_step_handler(message, give_weather_city)
-
-
-def give_weather_city(message):
-    city = message.text
-    if message.content_type != 'text':
-        bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
+    if message.text not in keyboard:
+        bot.send_message(message.from_user.id,
+                         'Выберите действие из предложенных')
         return
-    # TODO: добавить здесь валидации
-    # добавка пользователя в бд
-    content = get_weather(city)
-
-    bot.send_message(message.from_user.id, content)
+    if message.text == 'Узнать погоду':
+        city = execute_selection_query("SELECT city FROM database WHERE user_id = ?", (message.from_user.id,))[0][0]
+        weather = get_weather(city)
+        bot.send_message(message.from_user.id, weather)
+    elif message.text == 'Узнать интересные места' or 'Узнать экстренные контакты':
+        status, content = gpt(message)
+        if status:
+            bot.send_message(message.from_user.id, content) # Ответ
+        else:
+            bot.send_message(message.from_user.id, content) # При ошибке будет выдавать её.
 
 
 @bot.message_handler(commands=["debug"])
