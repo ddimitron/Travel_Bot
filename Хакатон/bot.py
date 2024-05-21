@@ -2,17 +2,15 @@ import telebot
 import logging
 
 from telebot.types import KeyboardButton, ReplyKeyboardMarkup
-from gpt import gpt
+from gpt import gpt, promt
 from weather_function import get_weather
-from database import execute_selection_query, execute_query, prepare_database
+from database import execute_selection_query
 
-bot = telebot.TeleBot("7002498917:AAG82cmSQFUN_Y6epWLQkQEXlrlbTuIgHpg")
+bot = telebot.TeleBot()
 ADMIN = []  # список админов, должен быть в config.py
 keyboard = ['Узнать интересные места', 'Узнать экстренные контакты',
             'Узнать погоду'] # должнo быть в config.py
 
-
-prepare_database()
 
 def make_keyboard(items):
     markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -33,12 +31,7 @@ logging.basicConfig(
 def handle_start(message):
     bot.send_message(message.chat.id,
                      "Привет! Я твой помощник в путешествиях. "
-                     "Введите /help чтобы посмотреть доступные команды.")
-    user = execute_selection_query("SELECT * FROM database WHERE user_id = ?", (message.chat.id,))
-    if user:
-        handle_help(message)
-    else:
-        execute_query('''INSERT INTO database (user_id) VALUES (?)''', (message.chat.id,))
+                     "Чем я могу помочь?")
 
 
 @bot.message_handler(commands=['help'])
@@ -57,6 +50,7 @@ def choose_city(message):
 
 
 def choose_action(message):
+    city = message.text
     markup = make_keyboard(keyboard)
     if message.content_type != 'text':
         bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
@@ -64,7 +58,6 @@ def choose_action(message):
     # добавляем город в бд
     bot.send_message(message.from_user.id, 'Выбери что ты хочешь сделать',
                      reply_markup=markup)
-    execute_query('''UPDATE database SET city = ? WHERE user_id = ?''', (message.text, message.from_user.id))
     bot.register_next_step_handler(message, give_info_city)
 
 
@@ -77,15 +70,13 @@ def give_info_city(message):
                          'Выберите действие из предложенных')
         return
     if message.text == 'Узнать погоду':
-        city = execute_selection_query("SELECT city FROM database WHERE user_id = ?", (message.from_user.id,))[0][0]
-        weather = get_weather(city)
-        bot.send_message(message.from_user.id, weather)
-    elif message.text == 'Узнать интересные места' or 'Узнать экстренные контакты':
-        status, content = gpt(message)
-        if status:
-            bot.send_message(message.from_user.id, content) # Ответ
-        else:
-            bot.send_message(message.from_user.id, content) # При ошибке будет выдавать её.
+        get_weather(message)
+    promt(message)
+    status, content = gpt(message)
+    if status:
+        bot.send_message(message.from_user.id, content) # Ответ
+    else:
+        bot.send_message(message.from_user.id, content) # При ошибке будет выдавать её.
 
 
 @bot.message_handler(commands=["debug"])
