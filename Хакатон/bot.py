@@ -53,25 +53,22 @@ def handle_help(message):
 @bot.message_handler(commands=['choose_city'])
 def choose_city(message):
     bot.send_message(message.from_user.id, "Напиши любой город мира:")
-    bot.register_next_step_handler(message, choose_action)
+    bot.register_next_step_handler(message, city)
 
+def city(message):
+    if message.content_type != 'text':
+        bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
+        bot.register_next_step_handler(message, choose_city)
+    execute_query('''UPDATE database SET city = ? WHERE user_id = ?''', (message.text, message.from_user.id))
+    choose_action(message)
 
 def choose_action(message):
     markup = make_keyboard(keyboard)
-    if message.content_type != 'text':
-        bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
-        return
-    # добавляем город в бд
     bot.send_message(message.from_user.id, 'Выбери что ты хочешь сделать',
                      reply_markup=markup)
-    execute_query('''UPDATE database SET city = ? WHERE user_id = ?''', (message.text, message.from_user.id))
     bot.register_next_step_handler(message, give_info_city)
 
-
 def give_info_city(message):
-    if message.content_type != 'text':
-        bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
-        return
     if message.text not in keyboard:
         bot.send_message(message.from_user.id,
                          'Выберите действие из предложенных')
@@ -80,10 +77,12 @@ def give_info_city(message):
         city = execute_selection_query("SELECT city FROM database WHERE user_id = ?", (message.from_user.id,))[0][0]
         weather = get_weather(city)
         bot.send_message(message.from_user.id, weather)
+        choose_action(message)
     elif message.text == 'Узнать интересные места' or 'Узнать экстренные контакты':
         status, content = gpt(message)
         if status:
             bot.send_message(message.from_user.id, content) # Ответ
+            choose_action(message)
         else:
             bot.send_message(message.from_user.id, content) # При ошибке будет выдавать её.
 
