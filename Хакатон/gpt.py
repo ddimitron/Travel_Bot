@@ -1,26 +1,25 @@
 import requests
 from database import *
 
-FOLDER_ID = "b1g23q9ip6n1jnscc7v7"
-GPT_MODEL = "yandexgpt-lite"
-TOKEN = "t1.9euelZrGzc7MjIqQlI-UjIuMk4zIzO3rnpWayI7Gl4rKiprMyouKlpbPj8bl8_ctdE1N-e94MVhI_d3z920iS03573gxWEj9zef1656Vmp7OnY3NlMeUicuQnpPOmpKS7_zF656Vmp7OnY3NlMeUicuQnpPOmpKSveuelZqelMqdipuZyZyNj5WJzZOUmLXehpzRnJCSj4qLmtGLmdKckJKPioua0pKai56bnoue0oye.UzCCuDTBPN0WgND96tvMGe4en53892b5kz2yuioXgwRn9ftiSU1cFMm0b9c7Hw42kh4wmplGUUAlTI18v8aRAw"
-MODEL_TEMPERATURE = "0.6"
-MAX_MODEL_TOKENS = "300"
+FOLDER_ID = ""
+GPT_MODEL = ""
+TOKEN = ""
+MODEL_TEMPERATURE = ""
+MAX_MODEL_TOKENS = ""
 
-def promt(message):
-    user_id = message.from_user.id
-    database = execute_selection_query('''SELECT city FROM database WHERE user_id = ?''', (user_id,))[0]
-    if message.text == "": # Впиши сюда то что у тебя будет на кнопке Посмотреть Контакты
-        return f"Скажи адреса Посольств, Аэропортов и Номера экстренных служб в городе {database[0]}."
-    elif message.text == "": # Впиши сюда то что у тебя будет на кнопке Посмотреть Достопримечательности
-        return f"Расскажи о достопримечательностях и впринципе своё мнение о городе {database[0]}. Ограничься 5 Достопримечательностями."
+def city():
+    city = execute_selection_query('''SELECT city, addition FROM database''')
+    url = f'https://api.openweathermap.org/data/2.5/weather?q={city}&units=metric&lang=ru&appid=79d1ca96933b0328e1c7e3e7a26cb347'
+    response = requests.get(url).json()
+    if response.status_code == 200:
+        weather_data = requests.get(url).json()
+        return True, weather_data
+    else:
+        return False, "При запросе к API возникла ошибка."
 
-# TODO GPT запросы для получения информации о городе или важных контактах
-def gpt(message):
+def gpt(city):
     # TOKEN = get_creds()
     url = f"https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
-
-    user_content = promt(message)
 
     headers = {
         'Authorization': f'Bearer {TOKEN}',
@@ -36,8 +35,8 @@ def gpt(message):
         },
         "messages": [
             {"role": "system",
-             "text": "Ты бот помощник в путешествиях и ты должен помогать пользователю узнать о городе в который он хочет поехать. Не используй ссылки на страницы в браузере."},
-            {"role": "user", "text": user_content},
+             "text": ""},
+            {"role": "user", "text": ""},
         ]
     }
 
@@ -47,14 +46,6 @@ def gpt(message):
         return True, result
     else:
         return False, "При запросе к YandexGPT возникла ошибка."
-
-# TODO Инструкция как получать ответ от яндект GPT:
-# status, content = gpt(message)
-# if status:
-#     print(content) # Ответ
-# else:
-#     print(content) # При ошибке будет выдавать её.
-
 
 
 
