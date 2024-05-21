@@ -2,11 +2,14 @@ import telebot
 import logging
 
 from telebot.types import KeyboardButton, ReplyKeyboardMarkup
-from gpt import gpt
+from gpt import gpt, promt
 from weather_function import get_weather
+from database import execute_selection_query
 
 bot = telebot.TeleBot()
 ADMIN = []  # список админов, должен быть в config.py
+keyboard = ['Узнать интересные места', 'Узнать экстренные контакты',
+            'Узнать погоду'] # должнo быть в config.py
 
 
 def make_keyboard(items):
@@ -33,51 +36,47 @@ def handle_start(message):
 
 @bot.message_handler(commands=['help'])
 def handle_help(message):
-    keyboard = ['/info_city', '/weather_city']
-    markup = make_keyboard(keyboard)
+
     bot.send_message(message.from_user.id,
                      "Привет, я помогу тебе в путешествиях. "
                      "Для работы нажимай на кнопки снизу\n"
-                     "/info_city - информация о городе и его "
-                     "интересных местах\n"
-                     "/weather_city - подсказать погоду в городе",
-                     reply_markup=markup)
+                     "/choose_city - выбрать город")
 
 
-@bot.message_handler(commands=['info_city'])
-def choice_city(message):
+@bot.message_handler(commands=['choose_city'])
+def choose_city(message):
     bot.send_message(message.from_user.id, "Напиши любой город мира:")
+    bot.register_next_step_handler(message, choose_action)
+
+
+def choose_action(message):
+    city = message.text
+    markup = make_keyboard(keyboard)
+    if message.content_type != 'text':
+        bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
+        return
+    # добавляем город в бд
+    bot.send_message(message.from_user.id, 'Выбери что ты хочешь сделать',
+                     reply_markup=markup)
     bot.register_next_step_handler(message, give_info_city)
 
 
 def give_info_city(message):
-    city = message.text
     if message.content_type != 'text':
         bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
         return
-    # TODO: добавить здесь валидации
-    # добавка пользователя в бд
-    status, content = gpt(city)
-
-    bot.send_message(message.from_user.id, content)
-
-
-@bot.message_handler(commands=['weather_city'])
-def choice_city(message):
-    bot.send_message(message.from_user.id, "Напиши любой город мира:")
-    bot.register_next_step_handler(message, give_weather_city)
-
-
-def give_weather_city(message):
-    city = message.text
-    if message.content_type != 'text':
-        bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
+    if message.text not in keyboard:
+        bot.send_message(message.from_user.id,
+                         'Выберите действие из предложенных')
         return
-    # TODO: добавить здесь валидации
-    # добавка пользователя в бд
-    content = get_weather(city)
-
-    bot.send_message(message.from_user.id, content)
+    if message.text == 'Узнать погоду':
+        get_weather(message)
+    promt(message)
+    status, content = gpt(message)
+    if status:
+        bot.send_message(message.from_user.id, content) # Ответ
+    else:
+        bot.send_message(message.from_user.id, content) # При ошибке будет выдавать её.
 
 
 @bot.message_handler(commands=["debug"])
