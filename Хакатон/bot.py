@@ -42,8 +42,9 @@ def handle_start(message):
 def handle_help(message):
     bot.send_message(message.from_user.id,
                      "Привет, я помогу тебе в путешествиях. "
-                     "Для работы нажимай на команду снизу\n"
-                     "/choose_city - выбрать город")
+                     "Для работы нажимай на команды снизу\n"
+                     "/choose_city - выбрать город\n"
+                     "/give_feedback - оставить обратную связь")
 
 
 @bot.message_handler(commands=['choose_city'])
