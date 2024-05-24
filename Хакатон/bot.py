@@ -56,9 +56,10 @@ def choose_city(message):
 def city(message):
     if message.content_type != 'text':
         bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
-        bot.register_next_step_handler(message, choose_city)
+        choose_city(message)
+        return
     execute_query('''UPDATE database SET city = ? WHERE user_id = ?''', (message.text, message.from_user.id))
-    bot.register_next_step_handler(message, choose_action)
+    choose_action(message)
 
 
 def choose_action(message):
@@ -79,14 +80,14 @@ def give_info_city(message):
         weather = get_weather(city)
         bot.send_message(message.from_user.id, weather)
         choose_action(message)
-
+        return
     elif message.text == 'Другой город':
-        bot.register_next_step_handler(message, choose_city)
-
+        choose_city(message)
+        return
     status, content = gpt(message)
     if status:
         bot.send_message(message.from_user.id, content) # Ответ
-        bot.register_next_step_handler(message, choose_action)
+        choose_action(message)
     else:
         bot.send_message(message.from_user.id, content) # При ошибке будет выдавать её.
 

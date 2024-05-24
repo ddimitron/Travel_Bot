@@ -1,6 +1,9 @@
 import requests
 from database import *
 from config import *
+import json
+import time
+
 def promt(message):
     user_id = message.from_user.id
     database = execute_selection_query('''SELECT city FROM database WHERE user_id = ?''', (user_id,))[0]
@@ -13,6 +16,7 @@ def promt(message):
 
 # TODO GPT запросы для получения информации о городе или важных контактах
 def gpt(message):
+    TOKEN = get_creds()
     url = f"https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
     user_content = promt(message)
@@ -44,9 +48,26 @@ def gpt(message):
     else:
         return False, "При запросе к YandexGPT возникла ошибка."
 
-# TODO Инструкция как получать ответ от яндект GPT:
-# status, content = gpt(message)
-# if status:
-#     print(content) # Ответ
-# else:
-#     print(content) # При ошибке будет выдавать её.
+def create_new_token():
+    metadata_url = "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token"
+    headers = {"Metadata-Flavor": "Google"}
+    response = requests.get(metadata_url, headers=headers)
+    token_data = response.json()
+    token_data["expires_at"] = time.time() + token_data["expires_in"]
+    with open("TOKEN_PATH.json", "w") as token_file:
+        json.dump(token_data, token_file)
+
+def get_creds():
+    try:
+        with open("TOKEN_PATH.json", "r") as f:
+            d = json.load(f)
+            expiration = d["expires_at"]
+        if expiration < time.time():
+            create_new_token()
+    except:
+        create_new_token()
+    with open("TOKEN_PATH.json", "r") as f:
+        d = json.load(f)
+        token = d["access_token"]
+
+    return token
