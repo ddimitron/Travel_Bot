@@ -5,11 +5,9 @@ from telebot.types import KeyboardButton, ReplyKeyboardMarkup
 from gpt import gpt
 from weather_function import get_weather
 from database import execute_selection_query, execute_query, prepare_database
-from config import ADMINS, keyboard
+from config import keyboard, keyboard2, ADMINS
 
 bot = telebot.TeleBot("7002498917:AAG82cmSQFUN_Y6epWLQkQEXlrlbTuIgHpg")
-#ТГ токен убирать отсюда?
-
 
 def make_keyboard(items):
     markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -28,26 +26,33 @@ logging.basicConfig(
 
 @bot.message_handler(commands=['start'])
 def handle_start(message):
-    bot.send_message(message.chat.id,
-                     "Привет! Я твой помощник в путешествиях. "
-                     "Введите /help чтобы посмотреть доступные команды.")
     user = execute_selection_query("SELECT * FROM database WHERE user_id = ?", (message.chat.id,))
     if user:
-        handle_help(message)
+        start_keyboard(message)
     else:
         execute_query('''INSERT INTO database (user_id) VALUES (?)''', (message.chat.id,))
+        bot.send_message(message.chat.id,
+                         "Привет! Я твой помощник в путешествиях. Что бы ознакомиться с информацией как мной пользоваться нажмите на кнопку помощь.")
+        start_keyboard(message)
 
+def start_keyboard(message):
+    markup = make_keyboard(keyboard2)
+    bot.send_message(message.from_user.id, 'Выбери что ты хочешь сделать',
+                        reply_markup=markup)
+    bot.register_next_step_handler(message, detection_start_start_keyboard)
+def detection_start_start_keyboard(message):
+    if message.text == "Дать Обратную свзязь":
+        reception_back_info(message)
+    elif message.text == "Помощь":
+        handle_help(message)
+    elif message.text == "Выбрать город":
+        choose_city(message)
 
-@bot.message_handler(commands=['help'])
 def handle_help(message):
     bot.send_message(message.from_user.id,
-                     "Привет, я помогу тебе в путешествиях. "
-                     "Для работы нажимай на команды снизу\n"
-                     "/choose_city - выбрать город\n"
-                     "/give_feedback - оставить обратную связь")
+                     "Это бот - Помощник в путешествиях, он может рассказать о городе что бы начать нужно нажать на кнопку выбрать город и ввести нужный вам город.")
+    start_keyboard(message)
 
-
-@bot.message_handler(commands=['choose_city'])
 def choose_city(message):
     bot.send_message(message.from_user.id, "Напиши любой город мира:")
     bot.register_next_step_handler(message, city)
@@ -58,8 +63,13 @@ def city(message):
         bot.send_message(message.from_user.id, 'Отправь текстовое сообщение')
         choose_city(message)
         return
-    execute_query('''UPDATE database SET city = ? WHERE user_id = ?''', (message.text, message.from_user.id))
-    choose_action(message)
+    status, content = get_weather(message.text)
+    if status:
+        execute_query('''UPDATE database SET city = ? WHERE user_id = ?''', (message.text, message.from_user.id))
+        choose_action(message)
+    else:
+        bot.send_message(message.from_user.id, "Такого города несуществует.")
+        choose_city(message)
 
 
 def choose_action(message):
@@ -77,12 +87,15 @@ def give_info_city(message):
 
     if message.text == 'Узнать погоду':
         city = execute_selection_query("SELECT city FROM database WHERE user_id = ?", (message.from_user.id,))[0][0]
-        weather = get_weather(city)
-        bot.send_message(message.from_user.id, weather)
+        status, content = get_weather(city)
+        bot.send_message(message.from_user.id, content)
         choose_action(message)
         return
     elif message.text == 'Другой город':
         choose_city(message)
+        return
+    elif message.text =="Вернуться в главное меню":
+        start_keyboard(message)
         return
     status, content = gpt(message)
     if status:
@@ -91,8 +104,6 @@ def give_info_city(message):
     else:
         bot.send_message(message.from_user.id, content) # При ошибке будет выдавать её.
 
-
-@bot.message_handler(commands=["give_feedback"])
 def reception_back_info(message):
     bot.send_message(message.from_user.id, "Напиши обратную связь:")
     bot.register_next_step_handler(message, send_back_info)
@@ -100,9 +111,9 @@ def reception_back_info(message):
 
 def send_back_info(message):
     bot.send_message(message.chat.id, "Спасибо за обратную связь")
-    for admin in ADMINS:
-        bot.send_message(admin, f"От юзера {message.from_user.id} "
-                                f"отправлена обратная информация:\n {message.text}")
+    bot.send_message("-1002217836488", f"От юзера {message.from_user.id} "
+                            f"отправлена обратная информация:\n {message.text}")
+    start_keyboard(message)
 
 
 @bot.message_handler(commands=["debug"])

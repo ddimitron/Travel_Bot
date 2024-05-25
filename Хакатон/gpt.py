@@ -20,7 +20,6 @@ def gpt(message):
     url = f"https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
     user_content = promt(message)
-    print(user_content)
 
     headers = {
         'Authorization': f'Bearer {TOKEN}',
