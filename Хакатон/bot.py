@@ -7,7 +7,7 @@ from weather_function import get_weather
 from database import execute_selection_query, execute_query, prepare_database
 from config import keyboard, keyboard2, ADMINS
 
-bot = telebot.TeleBot("7002498917:AAG82cmSQFUN_Y6epWLQkQEXlrlbTuIgHpg")
+bot = telebot.TeleBot("")
 
 def make_keyboard(items):
     markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -35,6 +35,11 @@ def handle_start(message):
                          "Привет! Я твой помощник в путешествиях. Что бы ознакомиться с информацией как мной пользоваться нажмите на кнопку помощь.")
         start_keyboard(message)
 
+def handle_help(message):
+    bot.send_message(message.from_user.id,
+                     "Это бот - Помощник в путешествиях, он может рассказать о городе что бы начать нужно нажать на кнопку выбрать город и ввести нужный вам город.")
+    start_keyboard(message)
+
 def start_keyboard(message):
     markup = make_keyboard(keyboard2)
     bot.send_message(message.from_user.id, 'Выбери что ты хочешь сделать',
@@ -47,11 +52,6 @@ def detection_start_start_keyboard(message):
         handle_help(message)
     elif message.text == "Выбрать город":
         choose_city(message)
-
-def handle_help(message):
-    bot.send_message(message.from_user.id,
-                     "Это бот - Помощник в путешествиях, он может рассказать о городе что бы начать нужно нажать на кнопку выбрать город и ввести нужный вам город.")
-    start_keyboard(message)
 
 def choose_city(message):
     bot.send_message(message.from_user.id, "Напиши любой город мира:")
